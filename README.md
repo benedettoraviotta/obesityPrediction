@@ -1,1 +1,1 @@
-# obesityPrediction
+# Wine quality prediction
