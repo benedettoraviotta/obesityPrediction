@@ -1,6 +1,7 @@
 #install.packages("ggplot2")
 #install.packages("ggcorrplot")
 
+
 wine.data = read.csv("winequality-white.csv", header = TRUE, sep=";")
 
 str(wine.data)
@@ -46,10 +47,13 @@ plot(
   col = wine.active$quality_label
 )
 
-ggplot(wine.active, aes(x=volatile.acidity , y=alcohol,colour='red',size=3 ))  +
+
+ggplot(wine.active, aes(x=volatile.acidity , y=alcohol, colour=factor(quality_label)))  +
   geom_point() + 
   labs(x="volatile.acidity", 
        y="alchool", 
        title = "Wine data set",
        subtitle = "Scatter plot"
-  )
+  ) + 
+  theme_minimal()
+
