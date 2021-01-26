@@ -1,13 +1,13 @@
 #install.packages("ggplot2")
 #install.packages("ggcorrplot")
-
+#install.packages("caret")
 
 wine.data = read.csv("winequality-white.csv", header = TRUE, sep=";")
 
 str(wine.data)
 
-wine.data$quality_label = 1
-wine.data$quality_label[wine.data$quality < 6] = 0
+wine.data$quality_label = "Alta"
+wine.data$quality_label[wine.data$quality < 6] = "Bassa"
 wine.data$quality_label = factor(wine.data$quality_label)
 
 # seleziono tutte le variabili tranne "quality"
@@ -37,23 +37,28 @@ featurePlot(x, y, plot="density", scales=list(x=list(relation="free"),
 
 
 # ANALISI MULTIVARIATA
-# visualization of instances' distributions
-ggplot(wine.active, aes(x=quality_label, y=alcohol, colours = quality_label)) + 
-  geom_jitter() + ggtitle("Relation between quality_label, alcohol and their classification")
+# We now use a scatterplot matrice to roughly determine if there is a linear correlation between our variables:
+pairs(wine.active[,c(7, 8, 10, 11)], col = wine.active$quality_label, oma=c(3,3,3,15))
+par(xpd = TRUE)
+legend("bottomright", fill = unique(wine.active$quality_label), legend = c( levels(wine.active$quality_label)))
 
+# visualization of instances' distributions
 plot(
   x = wine.active$alcohol,
-  y = wine.active$volatile.acidity,
+  y = wine.active$density,
   col = wine.active$quality_label
-)
+) #scatter plot. Colore definito sulla base di quality labels
 
+plot(
+  x = wine.active$residual.sugar,
+  y = wine.active$density,
+  col = wine.active$quality_label
+) #scatter plot. Colore definito sulla base di quality labels
 
-ggplot(wine.active, aes(x=volatile.acidity , y=alcohol, colour=factor(quality_label)))  +
+ggplot(wine.active, aes(x=density , y=alcohol, colour=factor(quality_label)))  +
   geom_point() + 
-  labs(x="volatile.acidity", 
+  labs(x="density", 
        y="alchool", 
-       title = "Wine data set",
-       subtitle = "Scatter plot"
+       title = "Relazione tra densità e alcohol e la loro classificazione"
   ) + 
   theme_minimal()
-
