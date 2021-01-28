@@ -2,6 +2,8 @@
 #install.packages("ggcorrplot")
 #install.packages("caret")
 #install.packages("e1071")
+#install.packages("factoextra")
+#install.packages("randomForest")
 
 wine = read.csv("winequality-white.csv", header = TRUE, sep = ";")
 
@@ -184,3 +186,14 @@ svm.model = svm(quality_label ~ .,
 prediction.svm = predict(svm.model, testset.wine_ridotto)
 svm.table = table(testset.wine_ridotto$quality_label, prediction.svm)
 confusionMatrix(svm.table)
+
+## SECONDO MODELLO: RANDOM FOREST
+
+library(randomForest)
+forest.model = randomForest(quality_label ~ ., data=trainset)
+prediction.forest = predict(forest.model, newdata = testset)
+forest.table = table(prediction.forest, testset$quality_label)
+confusionMatrix(forest.table)
+
+
+
