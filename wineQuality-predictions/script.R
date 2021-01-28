@@ -3,19 +3,17 @@
 #install.packages("caret")
 #install.packages("e1071")
 
-wine.data = read.csv("winequality-white.csv", header = TRUE, sep = ";")
+wine = read.csv("winequality-white.csv", header = TRUE, sep = ";")
 
-str(wine.data)
-
-wine.data$quality_label = 2
-wine.data$quality_label[wine.data$quality < 6] = 1
-wine.data$quality_label[wine.data$quality > 7] = 3
+str(wine)
+wine.data = wine
+wine.data$quality_label = "Media"
+wine.data$quality_label[wine.data$quality < 6] = "Bassa"
+wine.data$quality_label[wine.data$quality > 7] = "Alta"
 wine.data$quality_label = factor(wine.data$quality_label)
-sapply(wine.data$quality_label, class)
 
 # seleziono tutte le variabili tranne "quality"
 wine.active = wine.data[,-c(12)]
-
 sum(is.na(wine.active)) # non ci sono valori nulli
 
 # ANALISI UNIVARIATA
@@ -74,17 +72,16 @@ ggplot(wine.active, aes(
 
 # matrice di correlazione
 library(ggcorrplot)
-wine.active$quality_label = as.numeric(wine.active$quality_label)
 ggcorrplot(
-  cor(wine.active),
+  cor(wine),
   hc.order = TRUE,
   type = "lower",
   lab = TRUE,
   insig = "blank"
 )
-wine.active$quality_label = factor(wine.active$quality_label)
 
-# modello SVM
+
+### PRIMO MODELLO SVM
 library(e1071)
 
 #creo training e test set
@@ -95,7 +92,7 @@ ind = sample(2,
 testset = wine.active[ind == 2, ]
 trainset = wine.active[ind == 1, ]
 
-#train del modello
+#train del modello senza parametri costo e gamma
 svm.model = svm(quality_label ~ .,
                 data = trainset,
                 type = "C-classification",
@@ -106,8 +103,6 @@ prediction.svm = predict(svm.model, testset)
 svm.table = table(testset$quality_label, prediction.svm)
 confusionMatrix(svm.table)
 
-
-#------------------------------------------------
 #tune model
 tune.out = tune(
   svm,
@@ -119,3 +114,73 @@ tune.out = tune(
     gamma = c(0.5, 1, 2, 3, 4)
   )
 )
+
+summary(tune.out) # best parameters: cost=1, gamma=0.5
+
+
+#train del modello con parametri cost=10, gamma=0.5
+svm.model = svm(quality_label ~ .,
+                data = trainset,
+                type = "C-classification",
+                kernel = "radial",
+                cost = 1,
+                gamma = 0.5)
+
+#testing del mdodello
+prediction.svm = predict(svm.model, testset)
+svm.table = table(testset$quality_label, prediction.svm)
+confusionMatrix(svm.table)
+
+# divido il dataset in due classi (alta qualità = 2, bassa = 1)
+wine_ridotto = wine
+
+wine_ridotto$quality_label = "Alta"
+wine_ridotto$quality_label[wine_ridotto$quality < 7] = "Bassa"
+wine_ridotto$quality_label = factor(wine_ridotto$quality_label)
+wine_ridotto.active = wine_ridotto[, -c(12)]
+
+#creo training e test set
+ind = sample(2,
+             nrow(wine_ridotto.active),
+             replace = TRUE,
+             prob = c(0.7, 0.3))
+testset.wine_ridotto = wine_ridotto.active[ind == 2, ]
+trainset.wine_ridotto = wine_ridotto.active[ind == 1, ]
+
+#train del model
+svm.model_wineRidotto = svm(quality_label ~ .,
+                data = trainset.wine_ridotto,
+                type = "C-classification",
+                kernel = "radial")
+
+#testing del mdodello
+prediction.svm = predict(svm.model_wineRidotto, testset.wine_ridotto)
+svmRidotta.table = table(testset.wine_ridotto$quality_label, prediction.svm)
+confusionMatrix(svmRidotta.table)
+
+#tune model
+tune.out = tune(
+  svm,
+  quality_label ~ .,
+  data = trainset.wine_ridotto,
+  kernel = "radial",
+  ranges = list(
+    cost = c(0.1 , 1 , 10 , 100 , 1000),
+    gamma = c(0.5, 1, 2, 3, 4)
+  )
+)
+
+summary(tune.out) #best costo: 10, gamma: 1
+
+#train del modello con parametri costo:
+svm.model = svm(quality_label ~ .,
+                data = trainset.wine_ridotto,
+                type = "C-classification",
+                kernel = "radial",
+                cost = 10,
+                gamma = 1)
+
+#testing del mdodello
+prediction.svm = predict(svm.model, testset.wine_ridotto)
+svm.table = table(testset.wine_ridotto$quality_label, prediction.svm)
+confusionMatrix(svm.table)
