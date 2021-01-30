@@ -4,6 +4,31 @@
 #install.packages("e1071")
 #install.packages("factoextra")
 #install.packages("randomForest")
+#install.packages("rpart")
+
+library(e1071)
+compute.svm = function(trainset, testset, kernel, cost=1, gamma=1){
+  svm.model = svm(quality_label ~ .,
+                  data = trainset,
+                  type = "C-classification",
+                  kernel = kernel,
+                  gamma = gamma,
+                  cost = cost)
+  
+  #testing del mdodello
+  prediction.svm = predict(svm.model, testset)
+  svm.table = table(testset$quality_label, prediction.svm)
+  confusionMatrix(svm.table)
+}
+
+library(randomForest)
+compute.randomForest = function(trainset, testset){
+
+  forest.model = randomForest(quality_label ~ ., data=trainset)
+  prediction.forest = predict(forest.model, newdata = testset)
+  forest.table = table(prediction.forest, testset$quality_label)
+  confusionMatrix(forest.table)
+}
 
 wine = read.csv("winequality-white.csv", header = TRUE, sep = ";")
 
@@ -17,6 +42,13 @@ wine.data$quality_label = factor(wine.data$quality_label)
 # seleziono tutte le variabili tranne "quality"
 wine.active = wine.data[,-c(12)]
 sum(is.na(wine.active)) # non ci sono valori nulli
+
+#DISTRIBUZIONE CLASSI
+table.distribuzione = table(wine.data$quality)
+barplot(table.distribuzione)
+
+table.distribuzione = table(wine.active$quality)
+barplot(table.distribuzione)
 
 # ANALISI UNIVARIATA
 # è importante dividere il dataset in attributi input e target
@@ -84,8 +116,6 @@ ggcorrplot(
 
 
 ### PRIMO MODELLO SVM
-library(e1071)
-
 #creo training e test set
 ind = sample(2,
              nrow(wine.active),
@@ -95,15 +125,7 @@ testset = wine.active[ind == 2, ]
 trainset = wine.active[ind == 1, ]
 
 #train del modello senza parametri costo e gamma
-svm.model = svm(quality_label ~ .,
-                data = trainset,
-                type = "C-classification",
-                kernel = "radial")
-
-#testing del mdodello
-prediction.svm = predict(svm.model, testset)
-svm.table = table(testset$quality_label, prediction.svm)
-confusionMatrix(svm.table)
+compute.svm(trainset, testset, "radial")
 
 #tune model
 tune.out = tune(
@@ -121,17 +143,10 @@ summary(tune.out) # best parameters: cost=1, gamma=0.5
 
 
 #train del modello con parametri cost=10, gamma=0.5
-svm.model = svm(quality_label ~ .,
-                data = trainset,
-                type = "C-classification",
-                kernel = "radial",
-                cost = 1,
-                gamma = 0.5)
+compute.svm(trainset, testset, "radial", cost=1, gamma=0.5)
 
-#testing del mdodello
-prediction.svm = predict(svm.model, testset)
-svm.table = table(testset$quality_label, prediction.svm)
-confusionMatrix(svm.table)
+
+#################################################################
 
 # divido il dataset in due classi (alta qualità = 2, bassa = 1)
 wine_ridotto = wine
@@ -141,6 +156,9 @@ wine_ridotto$quality_label[wine_ridotto$quality < 7] = "Bassa"
 wine_ridotto$quality_label = factor(wine_ridotto$quality_label)
 wine_ridotto.active = wine_ridotto[, -c(12)]
 
+table.distribuzione = table(wine_ridotto.active$quality_label)
+barplot(table.distribuzione)
+
 #creo training e test set
 ind = sample(2,
              nrow(wine_ridotto.active),
@@ -149,16 +167,8 @@ ind = sample(2,
 testset.wine_ridotto = wine_ridotto.active[ind == 2, ]
 trainset.wine_ridotto = wine_ridotto.active[ind == 1, ]
 
-#train del model
-svm.model_wineRidotto = svm(quality_label ~ .,
-                data = trainset.wine_ridotto,
-                type = "C-classification",
-                kernel = "radial")
 
-#testing del mdodello
-prediction.svm = predict(svm.model_wineRidotto, testset.wine_ridotto)
-svmRidotta.table = table(testset.wine_ridotto$quality_label, prediction.svm)
-confusionMatrix(svmRidotta.table)
+compute.svm(trainset.wine_ridotto, testset.wine_ridotto, "radial")
 
 #tune model
 tune.out = tune(
@@ -174,26 +184,24 @@ tune.out = tune(
 
 summary(tune.out) #best costo: 10, gamma: 1
 
-#train del modello con parametri costo:
-svm.model = svm(quality_label ~ .,
-                data = trainset.wine_ridotto,
-                type = "C-classification",
-                kernel = "radial",
-                cost = 10,
-                gamma = 1)
+compute.svm(trainset.wine_ridotto, testset.wine_ridotto, "radial", cost=10, gamma=1)
 
-#testing del mdodello
-prediction.svm = predict(svm.model, testset.wine_ridotto)
-svm.table = table(testset.wine_ridotto$quality_label, prediction.svm)
-confusionMatrix(svm.table)
-
+###############################################
 ## SECONDO MODELLO: RANDOM FOREST
+compute.randomForest(trainset, testset)
 
-library(randomForest)
-forest.model = randomForest(quality_label ~ ., data=trainset)
-prediction.forest = predict(forest.model, newdata = testset)
-forest.table = table(prediction.forest, testset$quality_label)
-confusionMatrix(forest.table)
+#creo training e test set senza densità
+ind = sample(2,
+             nrow(wine.senzaDensita),
+             replace = TRUE,
+             prob = c(0.7, 0.3))
+testsetSD = wine.senzaDensita[ind == 2, ]
+trainsetSD = wine.senzaDensita[ind == 1, ]
 
+compute.randomForest(trainsetSD, testsetSD)
 
+#### testo su dataset con classe ALTA e BASSA
+compute.randomForest(trainset.wine_ridotto, testset.wine_ridotto)
 
+#########################################
+#precision, recall, fmeasure, ROC, 10crossfoldvalidation
