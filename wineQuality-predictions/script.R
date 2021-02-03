@@ -6,6 +6,11 @@
 #install.packages("randomForest")
 #install.packages("rpart")
 #install.packages("ROCR")
+install.packages("pROC")
+install.packages("ROSE")
+library(pROC)
+
+
 
 library(e1071)
 compute.svm = function(trainset, testset, kernel, cost=1, gamma=1, mode="sens_spec", positive = "Alta" ){
@@ -79,7 +84,7 @@ featurePlot(
 )
 
 
-# ANALISI MULTIVARIATA
+### ANALISI MULTIVARIATA ###
 
 # matrice di correlazione
 library(ggcorrplot)
@@ -239,7 +244,7 @@ compute.randomForest(trainset, testset ,mode = "prec_recall")
 library(ROCR)
 
 # Dataset qualità Alta/Bassa
-svm.fit = svm.model = svm(quality_label ~ .,
+svm.fit = svm(quality_label ~ .,
                           data = trainset.wine_ridotto,
                           type = "C-classification",
                           kernel = "radial",
@@ -251,6 +256,8 @@ pred = predict(svm.fit, testset.wine_ridotto, prob = TRUE)
 pred.prob = attr(pred, "probabilities")
 pred.to.roc = pred.prob[, 2]
 
+table(testset.wine_ridotto$quality_label, pred)
+
 pred.rocr = prediction(pred.to.roc, testset.wine_ridotto$quality_label)
 
 perf.rocr = performance(pred.rocr, measure = "auc", x.measure = "cutoff")
@@ -258,6 +265,21 @@ perf.tpr.rocr = performance(pred.rocr, "tpr","fpr")
 
 plot(perf.tpr.rocr, colorize=TRUE,main=paste("AUC:",(perf.rocr@y.values)))
 abline(a=0, b=1)
+
+
+#roc per svm diversa?
+library(ROSE)
+roc.curve(testset.wine_ridotto$quality_label, pred)
+
+
+
+# ROC random forest
+wine.rf = randomForest(quality_label ~ ., data=trainset.wine_ridotto, ntree=500)
+y_pred = prediction.forest = predict(wine.rf, newdata = testset.wine_ridotto)
+roc.curve(testset.wine_ridotto$quality_label, y_pred)
+
+
+
 
 # optimal cut function definition
 
