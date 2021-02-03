@@ -5,9 +5,10 @@
 #install.packages("factoextra")
 #install.packages("randomForest")
 #install.packages("rpart")
+#install.packages("ROCR")
 
 library(e1071)
-compute.svm = function(trainset, testset, kernel, cost=1, gamma=1){
+compute.svm = function(trainset, testset, kernel, cost=1, gamma=1, mode="sens_spec", positive = "Alta" ){
   svm.model = svm(quality_label ~ .,
                   data = trainset,
                   type = "C-classification",
@@ -18,16 +19,16 @@ compute.svm = function(trainset, testset, kernel, cost=1, gamma=1){
   #testing del mdodello
   prediction.svm = predict(svm.model, testset)
   svm.table = table(testset$quality_label, prediction.svm)
-  confusionMatrix(svm.table)
+  confusionMatrix(svm.table, mode = mode, positive = positive)
 }
 
 library(randomForest)
-compute.randomForest = function(trainset, testset){
+compute.randomForest = function(trainset, testset, mode="sens_spec", positive = "Alta"){
 
   forest.model = randomForest(quality_label ~ ., data=trainset)
   prediction.forest = predict(forest.model, newdata = testset)
   forest.table = table(prediction.forest, testset$quality_label)
-  confusionMatrix(forest.table)
+  confusionMatrix(forest.table, mode = mode, positive = positive)
 }
 
 wine = read.csv("winequality-white.csv", header = TRUE, sep = ";")
@@ -79,7 +80,20 @@ featurePlot(
 
 
 # ANALISI MULTIVARIATA
-# We now use a scatterplot matrice to roughly determine if there is a linear correlation between our variables:
+
+# matrice di correlazione
+library(ggcorrplot)
+ggcorrplot(
+  cor(wine),
+  hc.order = TRUE,
+  type = "lower",
+  lab = TRUE,
+  insig = "blank"
+)
+
+
+# We now use a scatterplot matrice to roughly determine if there is a linear 
+# correlation between some of our variables:
 pairs(wine.active[, c(7, 8, 10, 11)],
       col = wine.active$quality_label,
       oma = c(3, 3, 3, 15))
@@ -102,17 +116,18 @@ ggplot(wine.active, aes(
        title = "Relazione tra densità e alcohol e la loro classificazione") +
   theme_minimal()
 
-# stampare relazione tra altri attributi e analisi e bivariata
 
-# matrice di correlazione
-library(ggcorrplot)
-ggcorrplot(
-  cor(wine),
-  hc.order = TRUE,
-  type = "lower",
-  lab = TRUE,
-  insig = "blank"
-)
+ggplot(wine.active, aes(
+  x = density,
+  y = residual.sugar,
+  colour = factor(quality_label)
+))  +
+  geom_point() +
+  labs(x = "density",
+       y = "residual.sugar",
+       title = "Relazione tra residual.sugar e density e la loro classificazione") +
+  theme_minimal()
+
 
 
 ### PRIMO MODELLO SVM
@@ -186,22 +201,73 @@ summary(tune.out) #best costo: 10, gamma: 1
 
 compute.svm(trainset.wine_ridotto, testset.wine_ridotto, "radial", cost=10, gamma=1)
 
+
 ###############################################
 ## SECONDO MODELLO: RANDOM FOREST
 compute.randomForest(trainset, testset)
 
-#creo training e test set senza densità
-ind = sample(2,
-             nrow(wine.senzaDensita),
-             replace = TRUE,
-             prob = c(0.7, 0.3))
-testsetSD = wine.senzaDensita[ind == 2, ]
-trainsetSD = wine.senzaDensita[ind == 1, ]
-
-compute.randomForest(trainsetSD, testsetSD)
 
 #### testo su dataset con classe ALTA e BASSA
 compute.randomForest(trainset.wine_ridotto, testset.wine_ridotto)
 
 #########################################
-#precision, recall, fmeasure, ROC, 10crossfoldvalidation
+#precision, recall, fmeasure dei modelli
+
+# SVM dataset ridotto (Alta/Bassa)
+compute.svm(trainset.wine_ridotto, testset.wine_ridotto, "radial", cost=10, 
+            gamma=1, mode = "prec_recall", positive = "Bassa") # migliore per trovare bassa
+
+compute.svm(trainset.wine_ridotto, testset.wine_ridotto, "radial", cost=10, 
+            gamma=1, mode = "prec_recall", positive = "Alta")
+
+# Random Forest dataset ridotto (Alta/Bassa)
+compute.randomForest(trainset.wine_ridotto, testset.wine_ridotto, 
+                     mode = "prec_recall", positive = "Alta") 
+
+compute.randomForest(trainset.wine_ridotto, testset.wine_ridotto, 
+                     mode = "prec_recall", positive = "Bassa") # migliore per trovare bassa
+####------------------------------------------------------------------------
+# SVM dataset completo (Alta/Media/Bassa)
+compute.svm(trainset, testset, "radial", cost=1, gamma=0.5, 
+            mode = "prec_recall")
+
+# Random Forest dataset completo (Alta/Media/Bassa)
+compute.randomForest(trainset, testset ,mode = "prec_recall")
+
+################################################################
+###   CURVA ROC ###
+library(ROCR)
+
+# Dataset qualità Alta/Bassa
+svm.fit = svm.model = svm(quality_label ~ .,
+                          data = trainset.wine_ridotto,
+                          type = "C-classification",
+                          kernel = "radial",
+                          gamma = 10,
+                          cost = 1,
+                          prob = TRUE)
+
+pred = predict(svm.fit, testset.wine_ridotto, prob = TRUE)
+pred.prob = attr(pred, "probabilities")
+pred.to.roc = pred.prob[, 2]
+
+pred.rocr = prediction(pred.to.roc, testset.wine_ridotto$quality_label)
+
+perf.rocr = performance(pred.rocr, measure = "auc", x.measure = "cutoff")
+perf.tpr.rocr = performance(pred.rocr, "tpr","fpr")
+
+plot(perf.tpr.rocr, colorize=TRUE,main=paste("AUC:",(perf.rocr@y.values)))
+abline(a=0, b=1)
+
+# optimal cut function definition
+
+opt.cut = function(perf, pred){
+  cut.ind = mapply(FUN=function(x, y, p){
+    d = (x - 0)^2 + (y-1)^2
+    ind = which(d == min(d))
+    c(sensitivity = y[[ind]], specificity = 1-x[[ind]], cutoff = p[[ind]])
+  }, perf@x.values, perf@y.values, pred@cutoffs)
+}
+
+print(opt.cut(perf.tpr.rocr, pred.rocr))  #risolvere errore
+
