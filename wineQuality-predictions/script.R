@@ -8,9 +8,8 @@
 #install.packages("ROCR")
 install.packages("pROC")
 install.packages("ROSE")
-library(pROC)
-
-
+install.packages("kernlab")
+install.packages("party")
 
 library(e1071)
 compute.svm = function(trainset, testset, kernel, cost=1, gamma=1, mode="sens_spec", positive = "Alta" ){
@@ -241,7 +240,7 @@ compute.randomForest(trainset, testset ,mode = "prec_recall")
 
 ################################################################
 ###   CURVA ROC ###
-library(ROCR)
+library(ROSE)
 
 # Dataset qualità Alta/Bassa
 svm.fit = svm(quality_label ~ .,
@@ -253,24 +252,9 @@ svm.fit = svm(quality_label ~ .,
                           prob = TRUE)
 
 pred = predict(svm.fit, testset.wine_ridotto, prob = TRUE)
-pred.prob = attr(pred, "probabilities")
-pred.to.roc = pred.prob[, 2]
-
-table(testset.wine_ridotto$quality_label, pred)
-
-pred.rocr = prediction(pred.to.roc, testset.wine_ridotto$quality_label)
-
-perf.rocr = performance(pred.rocr, measure = "auc", x.measure = "cutoff")
-perf.tpr.rocr = performance(pred.rocr, "tpr","fpr")
-
-plot(perf.tpr.rocr, colorize=TRUE,main=paste("AUC:",(perf.rocr@y.values)))
-abline(a=0, b=1)
 
 
-#roc per svm diversa?
-library(ROSE)
 roc.curve(testset.wine_ridotto$quality_label, pred)
-
 
 
 # ROC random forest
@@ -278,18 +262,28 @@ wine.rf = randomForest(quality_label ~ ., data=trainset.wine_ridotto, ntree=500)
 y_pred = prediction.forest = predict(wine.rf, newdata = testset.wine_ridotto)
 roc.curve(testset.wine_ridotto$quality_label, y_pred)
 
+############### Model comparison ##############
+library(pROC) 
+library(kernlab)
+library(party)
+# Dataset qualità alta/bassa
 
+control = trainControl(method = "repeatedcv", number = 10, repeats = 3,
+                       classProbs = TRUE, summaryFunction = twoClassSummary)
 
+#svm reference compute.svm(trainset.wine_ridotto, testset.wine_ridotto, "radial", cost=10, gamma=1)
+#random forest reference compute.randomForest(trainset.wine_ridotto, testset.wine_ridotto)
+svm.model = train(quality_label ~ .,
+                  data = trainset.wine_ridotto,
+                  gamma = 1,
+                  cost = 10,
+                  method = "svmRadial", metric = "ROC", trControl = control)
 
-# optimal cut function definition
+randomforest.model = train(quality_label ~ .,
+                           data = trainset.wine_ridotto,
+                           method = "rf", 
+                           metric = "ROC",
+                           trControl = control)
 
-opt.cut = function(perf, pred){
-  cut.ind = mapply(FUN=function(x, y, p){
-    d = (x - 0)^2 + (y-1)^2
-    ind = which(d == min(d))
-    c(sensitivity = y[[ind]], specificity = 1-x[[ind]], cutoff = p[[ind]])
-  }, perf@x.values, perf@y.values, pred@cutoffs)
-}
-
-print(opt.cut(perf.tpr.rocr, pred.rocr))  #risolvere errore
-
+svm.probs = predict(svm.model, testset.wine_ridotto[,! names(testset.wine_ridotto) %in% c("quality_label")],
+                    type = "prob")
