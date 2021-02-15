@@ -219,7 +219,7 @@ compute.randomForest(trainset.wine_ridotto, testset.wine_ridotto)
 
 # SVM dataset ridotto (Alta/Bassa)
 compute.svm(trainset.wine_ridotto, testset.wine_ridotto, "radial", cost=10, 
-            gamma=1, mode = "prec_recall", positive = "Bassa") # migliore per trovare bassa
+            gamma=1, mode = "prec_recall", positive = "Bassa") 
 
 compute.svm(trainset.wine_ridotto, testset.wine_ridotto, "radial", cost=10, 
             gamma=1, mode = "prec_recall", positive = "Alta")
@@ -229,7 +229,7 @@ compute.randomForest(trainset.wine_ridotto, testset.wine_ridotto,
                      mode = "prec_recall", positive = "Alta") 
 
 compute.randomForest(trainset.wine_ridotto, testset.wine_ridotto, 
-                     mode = "prec_recall", positive = "Bassa") # migliore per trovare bassa
+                     mode = "prec_recall", positive = "Bassa")
 ####------------------------------------------------------------------------
 # SVM dataset completo (Alta/Media/Bassa)
 compute.svm(trainset, testset, "radial", cost=1, gamma=0.5, 
@@ -258,16 +258,17 @@ roc.curve(testset.wine_ridotto$quality_label, pred)
 
 
 # ROC random forest
-wine.rf = randomForest(quality_label ~ ., data=trainset.wine_ridotto, ntree=500)
+wine.rf = randomForest(quality_label ~ ., data=trainset.wine_ridotto)
 y_pred = prediction.forest = predict(wine.rf, newdata = testset.wine_ridotto)
 roc.curve(testset.wine_ridotto$quality_label, y_pred)
 
 ############### Model comparison ##############
+# 10-fold cross-validation
 library(pROC) 
 library(kernlab)
 library(party)
-# Dataset qualità alta/bassa
 
+# Dataset qualità alta/bassa
 control = trainControl(method = "repeatedcv", number = 10, repeats = 3,
                        classProbs = TRUE, summaryFunction = twoClassSummary)
 
@@ -287,3 +288,14 @@ randomforest.model = train(quality_label ~ .,
 
 svm.probs = predict(svm.model, testset.wine_ridotto[,! names(testset.wine_ridotto) %in% c("quality_label")],
                     type = "prob")
+
+rf.probs = predict(randomforest.model, testset.wine_ridotto[,! names(testset.wine_ridotto) %in% c("quality_label")],
+                   type = "prob")
+
+svm.ROC = roc(response = testset.wine_ridotto$quality_label, predictor = svm.probs$Bassa,
+               levels = levels(testset.wine_ridotto$quality_label))
+plot(svm.ROC, type = "S", col = "red")
+
+rf.ROC = roc(response = testset.wine_ridotto$quality_label, predictor = rf.probs$Bassa,
+              levels = levels(testset.wine_ridotto$quality_label))
+plot(rf.ROC, add = TRUE, col = "blue")
