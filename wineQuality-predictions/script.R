@@ -28,7 +28,7 @@ compute.svm = function(trainset, testset, kernel, cost=1, gamma=1, mode="sens_sp
 
 library(randomForest)
 compute.randomForest = function(trainset, testset, mode="sens_spec", positive = "Alta"){
-
+  
   forest.model = randomForest(quality_label ~ ., data=trainset)
   prediction.forest = predict(forest.model, newdata = testset)
   forest.table = table(prediction.forest, testset$quality_label)
@@ -249,12 +249,12 @@ library(ROSE)
 
 # Dataset qualità Alta/Bassa
 svm.fit = svm(quality_label ~ .,
-                          data = trainset.wine_ridotto,
-                          type = "C-classification",
-                          kernel = "radial",
-                          gamma = 10,
-                          cost = 1,
-                          prob = TRUE)
+              data = trainset.wine_ridotto,
+              type = "C-classification",
+              kernel = "radial",
+              gamma = 10,
+              cost = 1,
+              prob = TRUE)
 
 pred = predict(svm.fit, testset.wine_ridotto, prob = TRUE)
 
@@ -298,11 +298,11 @@ rf.probs = predict(randomforest.model, testset.wine_ridotto[,! names(testset.win
                    type = "prob")
 
 svm.ROC = roc(response = testset.wine_ridotto$quality_label, predictor = svm.probs$Bassa,
-               levels = levels(testset.wine_ridotto$quality_label))
+              levels = levels(testset.wine_ridotto$quality_label))
 plot(svm.ROC, type = "S", col = "red")
 
 rf.ROC = roc(response = testset.wine_ridotto$quality_label, predictor = rf.probs$Bassa,
-              levels = levels(testset.wine_ridotto$quality_label))
+             levels = levels(testset.wine_ridotto$quality_label))
 plot(rf.ROC, add = TRUE, col = "blue")
 
 svm.ROC
