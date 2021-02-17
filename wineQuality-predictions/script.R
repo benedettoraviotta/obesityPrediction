@@ -68,6 +68,7 @@ for (i in 1:11) {
 }
 par(oldpar)
 
+
 library(caret)
 # . We can have a more clear idea by plotting the distribution of
 #each feature of the input space
@@ -82,6 +83,14 @@ featurePlot(
   auto.key = list(columns = 3)
 )
 
+#distribuzione dei valori predittori
+install.packages("MASS")
+library("MASS")
+oldpar = par(mfrow = c(6,2))
+for ( i in 1:1 ) {
+  truehist(wine.active[[i]], xlab = names(wine.active)[i], col = 'lightgreen', main = paste("Average =", signif(mean(wine.active[[i]]),3)), nbins = 50)
+}
+par(oldpar)
 
 ### ANALISI MULTIVARIATA ###
 
@@ -95,6 +104,9 @@ ggcorrplot(
   insig = "blank"
 )
 
+
+#boxplot per relazione tra volume di alcol e qualità
+ggplot(data = wine.active, aes(y=wine.active$alcohol)) + geom_boxplot(aes(fill=wine.active$quality_label))
 
 # We now use a scatterplot matrice to roughly determine if there is a linear 
 # correlation between some of our variables:
@@ -167,7 +179,7 @@ compute.svm(trainset, testset, "radial", cost=1, gamma=0.5)
 
 #################################################################
 
-# divido il dataset in due classi (alta qualità = 2, bassa = 1)
+# divido il dataset in due classi (alta qualità, bassa qualità )
 wine_ridotto = wine
 
 wine_ridotto$quality_label = "Alta"
@@ -230,13 +242,6 @@ compute.randomForest(trainset.wine_ridotto, testset.wine_ridotto,
 
 compute.randomForest(trainset.wine_ridotto, testset.wine_ridotto, 
                      mode = "prec_recall", positive = "Bassa")
-####------------------------------------------------------------------------
-# SVM dataset completo (Alta/Media/Bassa)
-compute.svm(trainset, testset, "radial", cost=1, gamma=0.5, 
-            mode = "prec_recall")
-
-# Random Forest dataset completo (Alta/Media/Bassa)
-compute.randomForest(trainset, testset ,mode = "prec_recall")
 
 ################################################################
 ###   CURVA ROC ###
@@ -299,3 +304,15 @@ plot(svm.ROC, type = "S", col = "red")
 rf.ROC = roc(response = testset.wine_ridotto$quality_label, predictor = rf.probs$Bassa,
               levels = levels(testset.wine_ridotto$quality_label))
 plot(rf.ROC, add = TRUE, col = "blue")
+
+svm.ROC
+rf.ROC
+
+cv.values <- resamples(list(rf = randomforest.model, svm = svm.model))
+summary(cv.values)
+dotplot(cv.values, metric = "ROC") 
+
+bwplot(cv.values, layout = c(3, 1))
+splom(cv.values,metric="ROC")
+
+cv.values$timings
