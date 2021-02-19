@@ -1,17 +1,19 @@
-#install.packages("ggplot2")
-#install.packages("ggcorrplot")
-#install.packages("caret")
-#install.packages("e1071")
-#install.packages("factoextra")
-#install.packages("randomForest")
-#install.packages("rpart")
-#install.packages("ROCR")
+install.packages("ggplot2")
+install.packages("ggcorrplot")
+install.packages("caret")
+install.packages("e1071")
+install.packages("factoextra")
+install.packages("randomForest")
+install.packages("rpart")
+install.packages("ROCR")
 install.packages("pROC")
 install.packages("ROSE")
 install.packages("kernlab")
 install.packages("party")
+install.packages("MASS")
 
 library(e1071)
+#funzione per eseguire training e test dell'SVM
 compute.svm = function(trainset, testset, kernel, cost=1, gamma=1, mode="sens_spec", positive = "Alta" ){
   svm.model = svm(quality_label ~ .,
                   data = trainset,
@@ -27,6 +29,7 @@ compute.svm = function(trainset, testset, kernel, cost=1, gamma=1, mode="sens_sp
 }
 
 library(randomForest)
+#funzione per eseguire training e test con Random Forest
 compute.randomForest = function(trainset, testset, mode="sens_spec", positive = "Alta"){
   
   forest.model = randomForest(quality_label ~ ., data=trainset)
@@ -35,6 +38,7 @@ compute.randomForest = function(trainset, testset, mode="sens_spec", positive = 
   confusionMatrix(forest.table, mode = mode, positive = positive)
 }
 
+#caricamento del dataaset
 wine = read.csv("winequality-white.csv", header = TRUE, sep = ";")
 
 str(wine)
@@ -60,8 +64,7 @@ barplot(table.distribuzione)
 x = wine.active[, 1:11]
 y = wine.active[, 12]
 
-# It demonstrate that all variables, except alcohol contains outliers.
-# stampo boxplot per ogni attributo
+# Plot degli outliers
 oldpar = par(mfrow = c(2, 6))
 for (i in 1:11) {
   boxplot(x[, i], main = names(wine.active)[i])
@@ -70,8 +73,7 @@ par(oldpar)
 
 
 library(caret)
-# . We can have a more clear idea by plotting the distribution of
-#each feature of the input space
+# Plot distribuzione attributi per qualità
 featurePlot(
   x,
   y,
@@ -83,8 +85,8 @@ featurePlot(
   auto.key = list(columns = 3)
 )
 
-#distribuzione dei valori predittori
-install.packages("MASS")
+# Distribuzione dei valori predittori
+
 library("MASS")
 oldpar = par(mfrow = c(6,2))
 for ( i in 1:1 ) {
@@ -94,7 +96,7 @@ par(oldpar)
 
 ### ANALISI MULTIVARIATA ###
 
-# matrice di correlazione
+# Matrice di correlazione
 library(ggcorrplot)
 ggcorrplot(
   cor(wine),
@@ -105,11 +107,10 @@ ggcorrplot(
 )
 
 
-#boxplot per relazione tra volume di alcol e qualità
+# Boxplot per relazione tra volume di alcol e qualità
 ggplot(data = wine.active, aes(y=wine.active$alcohol)) + geom_boxplot(aes(fill=wine.active$quality_label))
 
-# We now use a scatterplot matrice to roughly determine if there is a linear 
-# correlation between some of our variables:
+# Determinamo se c'è correlazione lineare tra "total.sulfur.dioxide" - "density" - "sulphates" - "alcohol"
 pairs(wine.active[, c(7, 8, 10, 11)],
       col = wine.active$quality_label,
       oma = c(3, 3, 3, 15))
@@ -120,7 +121,7 @@ legend(
   legend = c(levels(wine.active$quality_label))
 )
 
-
+# Plot relazione densità e alcohol con qualità 
 ggplot(wine.active, aes(
   x = density ,
   y = alcohol,
@@ -132,7 +133,7 @@ ggplot(wine.active, aes(
        title = "Relazione tra densità e alcohol e la loro classificazione") +
   theme_minimal()
 
-
+# Plot relazione residual.sugar e densità con qualità 
 ggplot(wine.active, aes(
   x = density,
   y = residual.sugar,
@@ -158,7 +159,7 @@ trainset = wine.active[ind == 1, ]
 #train del modello senza parametri costo e gamma
 compute.svm(trainset, testset, "radial")
 
-#tune model
+#tune model per determinare paramentri migliori
 tune.out = tune(
   svm,
   quality_label ~ .,
@@ -201,7 +202,7 @@ trainset.wine_ridotto = wine_ridotto.active[ind == 1, ]
 
 compute.svm(trainset.wine_ridotto, testset.wine_ridotto, "radial")
 
-#tune model
+#tune model per determinare paramentri migliori
 tune.out = tune(
   svm,
   quality_label ~ .,
@@ -256,15 +257,20 @@ svm.fit = svm(quality_label ~ .,
               cost = 1,
               prob = TRUE)
 
+# Predizione con SVM usando Dataset qualità Alta/Bassa
 pred = predict(svm.fit, testset.wine_ridotto, prob = TRUE)
 
-
+# curva ROC SVM
 roc.curve(testset.wine_ridotto$quality_label, pred)
 
 
-# ROC random forest
+# Dataset qualità Alta/Bassa
 wine.rf = randomForest(quality_label ~ ., data=trainset.wine_ridotto)
+
+# Predizione con RF usando Dataset qualità Alta/Bassa
 y_pred = prediction.forest = predict(wine.rf, newdata = testset.wine_ridotto)
+
+# curva ROC RF
 roc.curve(testset.wine_ridotto$quality_label, y_pred)
 
 ############### Model comparison ##############
@@ -277,30 +283,33 @@ library(party)
 control = trainControl(method = "repeatedcv", number = 10, repeats = 3,
                        classProbs = TRUE, summaryFunction = twoClassSummary)
 
-#svm reference compute.svm(trainset.wine_ridotto, testset.wine_ridotto, "radial", cost=10, gamma=1)
-#random forest reference compute.randomForest(trainset.wine_ridotto, testset.wine_ridotto)
+# train SVM 10-fold
 svm.model = train(quality_label ~ .,
                   data = trainset.wine_ridotto,
                   gamma = 1,
                   cost = 10,
                   method = "svmRadial", metric = "ROC", trControl = control)
-
+# train RF 10-fold
 randomforest.model = train(quality_label ~ .,
                            data = trainset.wine_ridotto,
                            method = "rf", 
                            metric = "ROC",
                            trControl = control)
 
+# predizione SVM
 svm.probs = predict(svm.model, testset.wine_ridotto[,! names(testset.wine_ridotto) %in% c("quality_label")],
                     type = "prob")
 
+# predizione RF
 rf.probs = predict(randomforest.model, testset.wine_ridotto[,! names(testset.wine_ridotto) %in% c("quality_label")],
                    type = "prob")
 
+# curva ROC SVM dopo 10-fold
 svm.ROC = roc(response = testset.wine_ridotto$quality_label, predictor = svm.probs$Bassa,
               levels = levels(testset.wine_ridotto$quality_label))
 plot(svm.ROC, type = "S", col = "red")
 
+# curva ROC RF dopo 10-fold
 rf.ROC = roc(response = testset.wine_ridotto$quality_label, predictor = rf.probs$Bassa,
              levels = levels(testset.wine_ridotto$quality_label))
 plot(rf.ROC, add = TRUE, col = "blue")
@@ -308,6 +317,7 @@ plot(rf.ROC, add = TRUE, col = "blue")
 svm.ROC
 rf.ROC
 
+# vari plot di confronto tra SVM e RF con valori AUC e ROC 
 cv.values <- resamples(list(rf = randomforest.model, svm = svm.model))
 summary(cv.values)
 dotplot(cv.values, metric = "ROC") 
@@ -315,4 +325,5 @@ dotplot(cv.values, metric = "ROC")
 bwplot(cv.values, layout = c(3, 1))
 splom(cv.values,metric="ROC")
 
+# prestazioni temporali SVM vs RF
 cv.values$timings
