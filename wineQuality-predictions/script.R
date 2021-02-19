@@ -69,7 +69,6 @@ oldpar = par(mfrow = c(2, 6))
 for (i in 1:11) {
   boxplot(x[, i], main = names(wine.active)[i])
 }
-par(oldpar)
 
 
 library(caret)
@@ -88,11 +87,14 @@ featurePlot(
 # Distribuzione dei valori predittori
 
 library("MASS")
-oldpar = par(mfrow = c(6,2))
-for ( i in 1:1 ) {
+par(mar=c(1,1,1,1))
+oldpar = par(mfrow = c(3,2))
+for ( i in 1:6 ) {
   truehist(wine.active[[i]], xlab = names(wine.active)[i], col = 'lightgreen', main = paste("Average =", signif(mean(wine.active[[i]]),3)), nbins = 50)
 }
-par(oldpar)
+for ( i in 7:11) {
+  truehist(wine.active[[i]], xlab = names(wine.active)[i], col = 'lightgreen', main = paste("Average =", signif(mean(wine.active[[i]]),3)), nbins = 50)
+}
 
 ### ANALISI MULTIVARIATA ###
 
@@ -108,7 +110,7 @@ ggcorrplot(
 
 
 # Boxplot per relazione tra volume di alcol e qualità
-ggplot(data = wine.active, aes(y=wine.active$alcohol)) + geom_boxplot(aes(fill=wine.active$quality_label))
+ggplot(data = wine.active, aes(y=alcohol)) + geom_boxplot(aes(fill=quality_label))
 
 # Determinamo se c'è correlazione lineare tra "total.sulfur.dioxide" - "density" - "sulphates" - "alcohol"
 pairs(wine.active[, c(7, 8, 10, 11)],
